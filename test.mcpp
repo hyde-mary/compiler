@@ -1,6 +1,7 @@
 int y, x;
 
-int x = 10;
+int x = y;
 
-x = 1 + 1;
-y = 3;
+x = x + 1;
+hatdog = 20 + y;
+y = x;

@@ -267,26 +267,17 @@ namespace parser {
   class AssignmentNode : public Node {
   public:
     std::shared_ptr<IdentifierNode> identifier;
-    std::variant<std::shared_ptr<ConstantNode>, std::shared_ptr<ExpressionNode>>
-        assignment;
+    std::shared_ptr<Node> assignment;
 
     // Updated constructor to remove the line parameter
     AssignmentNode(std::shared_ptr<IdentifierNode> identifier,
-                  std::variant<std::shared_ptr<ConstantNode>,
-                                std::shared_ptr<ExpressionNode>>
-                      assignment)
+                  std::shared_ptr<Node>assignment)
         : identifier(std::move(identifier)), assignment(std::move(assignment)) {}
 
     void print() const override {
       std::cout << "- AssignmentNode" << " " << identifier->name << " "
                 << std::endl;
-      if (std::holds_alternative<std::shared_ptr<ConstantNode>>(assignment)) {
-        auto constant = std::get<std::shared_ptr<ConstantNode>>(assignment);
-        constant->print();
-      } else {
-        auto expression = std::get<std::shared_ptr<ExpressionNode>>(assignment);
-        expression->print();
-      }
+        assignment->print();
     }
   };
 
@@ -383,27 +374,32 @@ namespace parser {
       return std::make_shared<IdentifierNode>(token.lexeme, token.line);
     }
 
-    std::variant<std::shared_ptr<ConstantNode>, std::shared_ptr<ExpressionNode>> parseExpression() {
-      auto left =
-          parseConstant(); // this will parse a constant and consume the token
+    std::shared_ptr<Node> parseConstantOrIdentifier() {
+      if (peek().value().type == TokenType::CONSTANT) {
+        return parseConstant();
+      } else if (peek().value().type == TokenType::IDENTIFIER) {
+        return parseIdentifier();
+      } else {
+        throw std::runtime_error("Invalid token");
+      }
+    }
+
+    std::shared_ptr<Node> parseExpression() {
+      auto left = parseConstantOrIdentifier(); // this will parse a constant and consume the token
 
       // Check if the current token after consumption is an operator
-      if (peek().value().type == TokenType::ADDITION_OPERATOR) {
+      if (peek().value().type == TokenType::ADDITION_OPERATOR || peek().value().type == TokenType::SUBTRACTION_OPERATOR) {
         consume(); // Consume '+'
-        auto right = parseConstant();
-        return std::make_shared<ExpressionNode>('+', left, right);
-      } else if (peek().value().type == TokenType::SUBTRACTION_OPERATOR) {
-        consume(); // Consume '-'
-        auto right = parseConstant();
-        return std::make_shared<ExpressionNode>('-', left, right);
-      }
-      // If the token is not an operator, return the constant only
-      // this indicates a simple assignment operation
-
+        auto right =  parseConstantOrIdentifier();
+        char op = peek().value().type == TokenType::ADDITION_OPERATOR ? '+' : '-';
+        return std::make_shared<ExpressionNode>(op, left, right);
+      } 
       // Check if the next token is a delimiter (e.g., ';')
       auto token = peek().value();
       expect(TokenType::DELIMITER, token);
       
+      // If the token is not an operator, return the constant only
+      // this indicates a simple assignment operation
       return left;
     }
 
