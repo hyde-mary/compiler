@@ -325,6 +325,29 @@ namespace parser {
     }
   };
 
+  class StringLiteralNode : public Node {
+    public:
+      std::string literal;
+      StringLiteralNode(std::string literal) : literal(std::move(literal)) {}
+
+      void print() const override {
+        std::cout << "\t - StringLiteralNode " << "'" << literal << "'" << std::endl;
+      }
+  }; 
+
+  class CoutNode : public Node {
+    public:
+      std::vector<std::shared_ptr<Node>> operands;
+      CoutNode(std::vector<std::shared_ptr<Node>> operands) : operands(std::move(operands)) {}
+
+
+      void print() const override {
+        std::cout << "CoutNode " << std::endl;
+        for (const auto &operand : operands) {
+          operand->print();
+        }
+      }
+  };
   class Parser {
   public:
     Parser(std::vector<TOKEN> tokens) : TOKENS(std::move(tokens)), NODES{} {}
@@ -388,12 +411,15 @@ namespace parser {
       auto left = parseConstantOrIdentifier(); // this will parse a constant and consume the token
 
       // Check if the current token after consumption is an operator
-      if (peek().value().type == TokenType::ADDITION_OPERATOR || peek().value().type == TokenType::SUBTRACTION_OPERATOR) {
+      if (peek().value().type == TokenType::ADDITION_OPERATOR) {
         consume(); // Consume '+'
         auto right =  parseConstantOrIdentifier();
-        char op = peek().value().type == TokenType::ADDITION_OPERATOR ? '+' : '-';
-        return std::make_shared<ExpressionNode>(op, left, right);
-      } 
+        return std::make_shared<ExpressionNode>('+', left, right);
+      } else if (peek().value().type == TokenType::SUBTRACTION_OPERATOR) {
+        consume(); // Consume '-'
+        auto right =  parseConstantOrIdentifier();
+        return std::make_shared<ExpressionNode>('-', left, right);
+      }
       // Check if the next token is a delimiter (e.g., ';')
       auto token = peek().value();
       expect(TokenType::DELIMITER, token);
@@ -454,6 +480,11 @@ namespace parser {
           } else {
                 // Otherwise, it's just an identifier in a list of declarations
                 identifiers.push_back(identifier);
+
+                // checks if there is a missing punctuator
+                if (peek().has_value() && peek().value().type == TokenType::IDENTIFIER) {
+                    throw std::runtime_error("Syntax Error: Missing punctuator between identifiers.");
+                }
           }
         } else if (peek().value().type == TokenType::PUNCTUATOR) {
           consume();
@@ -466,6 +497,46 @@ namespace parser {
       expect(TokenType::DELIMITER, token);
       consume();
       return std::make_shared<DeclarationNode>(declarationType, identifiers);
+    }
+
+    std::shared_ptr<Node> parseLiteral() {
+      auto token = peek().value();
+      expect(TokenType::LITERAL, token);
+      consume();
+      return std::make_shared<StringLiteralNode>(token.lexeme);
+    }
+
+    std::shared_ptr<Node> parseCout() {
+
+      std::vector<std::shared_ptr<Node>> outputOperands;
+
+      auto token = peek().value();
+      expect(TokenType::COUT_KEYWORD, token);
+      consume();
+
+      while (peek().value().type == TokenType::IDENTIFIER || 
+        peek().value().type == TokenType::CONSTANT || 
+        peek().value().type == TokenType::LITERAL || 
+        peek().value().type == TokenType::COUT_OPERATOR) {
+
+        if (peek().value().type == TokenType::IDENTIFIER || peek().value().type == TokenType::CONSTANT) {
+            auto expr = parseExpression();
+            outputOperands.push_back(expr);
+        } else if (peek().value().type == TokenType::LITERAL) {
+            auto literal = parseLiteral();
+            outputOperands.push_back(literal);
+        } else if (peek().value().type == TokenType::COUT_OPERATOR) {
+            consume();
+            continue;
+        }
+      }
+
+      // expect token at the end
+      token = peek().value();
+      expect(TokenType::DELIMITER, token);
+      consume();
+
+      return std::make_shared<CoutNode>(outputOperands);
     }
 
     std::optional<std::shared_ptr<Node>> parseStatement() {
@@ -499,6 +570,17 @@ namespace parser {
           }
 
         } break;
+        case TokenType::COUT_KEYWORD: {
+            auto coutNode = parseCout();
+
+            if (coutNode) {
+              // Create a new SequenceNode and add the parsed statement
+              return coutNode;
+            } else {
+              throw std::runtime_error("Failed to parse statement at line " +
+                                      std::to_string(token.line));
+            }
+        }
       }
       return std::nullopt;
     }
@@ -545,6 +627,7 @@ namespace parser {
       }
     }
   };
+
 }; // namespace parser
 
 std::string printTokenType(

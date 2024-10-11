@@ -1,7 +1,6 @@
-int y, x;
+int x, y, z;
 
-int x = y;
+x = 1 + y;
+z = 10;
 
-x = x + 1;
-hatdog = 20 + y;
-y = x;
+cout << " Hello "<<" World ";
