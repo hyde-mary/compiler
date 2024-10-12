@@ -1,9 +1,11 @@
 int x, y, z;
 
-int hatdog = 20;
+int hat = 20 + 10;
 
-x = 1 + y;
+x = x + 10;
+hat = hat + 1;
+
 z = 10;
 
 cin>>x;
-cout << " Hello "<<" World ";
+cout<<x + 2<<hat;
