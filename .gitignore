@@ -1,4 +1,5 @@
 # ignore .exe
+*.cache
 *.exe
 *.bak
 compile_commands.json
