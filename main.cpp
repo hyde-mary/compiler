@@ -216,13 +216,13 @@ namespace parser {
 
   class IdentifierNode : public Node {
   public:
-    std::string name;
+    TOKEN identifier;
     int line; /* Line number of the identifier */
-    IdentifierNode(std::string name, int line)
-        : name(std::move(name)), line(line) {}
+    IdentifierNode(TOKEN identifier, int line)
+        : identifier(std::move(identifier)), line(line) {}
 
     void print() const override {
-      std::cout << "\t - IdentifierNode " << name << std::endl;
+      std::cout << "\t - IdentifierNode :: IDENTIFIER - " << identifier.lexeme << std::endl;
     }
   };
 
@@ -231,12 +231,12 @@ namespace parser {
     A constant node is a node that represents a constant or an Integer Literal.
     */
   public:
-    int value;
+    TOKEN constant;
     int line; /* Line number of the constant */
-    ConstantNode(int value, int line) : value(std::move(value)), line(line) {}
+    ConstantNode(TOKEN constant, int line) : constant(std::move(constant)), line(line) {}
 
     void print() const override {
-      std::cout << "\t - ConstantNode " << value << std::endl;
+      std::cout << "\t - ConstantNode " << constant.lexeme << std::endl;
     }
   };
 
@@ -275,7 +275,7 @@ namespace parser {
         : identifier(std::move(identifier)), assignment(std::move(assignment)) {}
 
     void print() const override {
-      std::cout << "- AssignmentNode" << " " << identifier->name << " "
+      std::cout << "- AssignmentNode" << " " << identifier->identifier.lexeme << " "
                 << std::endl;
         assignment->print();
     }
@@ -327,11 +327,11 @@ namespace parser {
 
   class StringLiteralNode : public Node {
     public:
-      std::string literal;
-      StringLiteralNode(std::string literal) : literal(std::move(literal)) {}
+      TOKEN literal;
+      StringLiteralNode(TOKEN literal) : literal(std::move(literal)) {}
 
       void print() const override {
-        std::cout << "\t - StringLiteralNode " << "'" << literal << "'" << std::endl;
+        std::cout << "\t - StringLiteralNode " << "'" << literal.lexeme << "'" << std::endl;
       }
   }; 
 
@@ -348,6 +348,20 @@ namespace parser {
         }
       }
   };
+
+  class CinNode : public Node {
+    public:
+      std::vector<std::shared_ptr<Node>> operands;
+      CinNode(std::vector<std::shared_ptr<Node>> operands) : operands(std::move(operands)) {}
+
+      void print() const override {
+        std::cout << "CinNode " << std::endl;
+        for (const auto &operand : operands) {
+          operand->print();
+        }
+      }
+  };
+ 
   class Parser {
   public:
     Parser(std::vector<TOKEN> tokens) : TOKENS(std::move(tokens)), NODES{} {}
@@ -387,14 +401,14 @@ namespace parser {
       expect(TokenType::CONSTANT,
             token); // check if the current token is a constant
       consume();
-      return std::make_shared<ConstantNode>(std::stoi(token.lexeme), token.line);
+      return std::make_shared<ConstantNode>(token, token.line);
     }
 
     std::shared_ptr<IdentifierNode> parseIdentifier() {
       auto token = peek().value();
       expect(TokenType::IDENTIFIER, token);
       consume();
-      return std::make_shared<IdentifierNode>(token.lexeme, token.line);
+      return std::make_shared<IdentifierNode>(token, token.line);
     }
 
     std::shared_ptr<Node> parseConstantOrIdentifier() {
@@ -503,7 +517,7 @@ namespace parser {
       auto token = peek().value();
       expect(TokenType::LITERAL, token);
       consume();
-      return std::make_shared<StringLiteralNode>(token.lexeme);
+      return std::make_shared<StringLiteralNode>(token);
     }
 
     std::shared_ptr<Node> parseCout() {
@@ -537,6 +551,36 @@ namespace parser {
       consume();
 
       return std::make_shared<CoutNode>(outputOperands);
+    }
+
+    std::shared_ptr<Node> parseCin() {
+      std::vector<std::shared_ptr<Node>> inputOperands;
+
+      auto token = peek().value();
+      expect(TokenType::CIN_KEYWORD, token);
+      consume();
+
+      while (peek().value().type == TokenType::IDENTIFIER || peek().value().type == TokenType::CIN_OPERATOR) {
+
+        if (peek().value().type == TokenType::IDENTIFIER) {
+          auto identifier = parseIdentifier();
+          inputOperands.push_back(identifier);
+        } else if (peek().value().type == TokenType::CIN_OPERATOR) {
+          consume();
+          // we always expect an identifier after the CIN operator
+          // if there is no identifier, the expect() will throw an error
+          token = peek().value();
+          expect(TokenType::IDENTIFIER, token);
+          continue;
+        }
+      }
+
+      // expect token at the end
+      token = peek().value();
+      expect(TokenType::DELIMITER, token);
+      consume();
+
+      return std::make_shared<CinNode>(inputOperands);
     }
 
     std::optional<std::shared_ptr<Node>> parseStatement() {
@@ -578,6 +622,18 @@ namespace parser {
               return coutNode;
             } else {
               throw std::runtime_error("Failed to parse statement at line " +
+                                      std::to_string(token.line));
+            }
+        }
+
+        case TokenType::CIN_KEYWORD: {
+            auto cinNode = parseCin();
+
+            if (cinNode) {
+              // Create a new SequenceNode and add the parsed statement
+              return cinNode;
+            } else {
+              throw std::runtime_error("Failed to parse statement at line " + 
                                       std::to_string(token.line));
             }
         }
