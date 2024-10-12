@@ -2,3 +2,5 @@
 *.exe
 *.bak
 compile_commands.json
+.vscode
+.mcpp
