@@ -8,7 +8,7 @@ CXXFLAGS = -Wall -Wextra -std=c++17
 TARGET = main.exe
 
 # Source files
-SRCS = src/main.cpp src/fetch_source_code.cpp
+SRCS = src/main.cpp src/fetch_source_code.cpp src/lexer.cpp
 
 # Rule to build the target
 $(TARGET): $(SRCS)
