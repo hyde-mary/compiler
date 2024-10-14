@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "C:/LLVM/bin",
+    "command": "clang++ -I../include -target x86_64-pc-windows-gnu -std=c++17 -DAL -Wall -O2 file.cpp -o file && file",
+    "file": "file.cpp"
+  }
+]
