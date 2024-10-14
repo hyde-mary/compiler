@@ -22,3 +22,7 @@ For executing, type in
 or you can try
 
 `main.exe source.mcpp`
+
+or
+
+`./main.exe source.mcpp`
