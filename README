@@ -9,7 +9,11 @@ On Command Line or a Terminal type in:
 
 `make`
 
-if it does not work, type in:
+you can also use:
+
+`compile.bat`
+
+if it still does not work, type in:
 
 `g++ main.cpp -o main`
 
