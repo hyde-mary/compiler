@@ -9,7 +9,7 @@ CXXFLAGS = -Wall -Wextra
 SRCS = main.cpp
 
 # Output executable name
-TARGET = main
+TARGET = main.exe
 
 # Default target
 all: $(TARGET)
