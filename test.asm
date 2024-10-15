@@ -1,28 +1,42 @@
 bits 64
 default rel
 
-segment .data
-    msg db "Tangina mo!", 0xd, 0xa, 0
+section .bss
+    x resd 1        ; Reserve 4 bytes for int x
+    
+
+section .data
+    fmt db "%d", 10, 0                ; Null terminator for the buffer
+
 
 segment .text
-global main
-extern ExitProcess
+    global main
+    extern ExitProcess
 
-extern printf
+    extern printf
 
-main:
+    main:
 
 
-    ; parang int main
-    ; prologe
-    push    rbp
-    mov     rbp, rsp
-    sub     rsp, 32
+        ; parang int main
+        ; prologe
+        push    rbp
+        mov     rbp, rsp
+        sub     rsp, 32
 
-    lea     rcx, [msg]
-    call    printf
-    
-    ; epilogue
-    ; parang return 0;
-    xor     rax, rax
-    call    ExitProcess
+        mov dword [x], 5
+        mov rax, [x]
+        add rax, 5
+
+        mov [x], rax
+
+        ; Prepare arguments for printf
+        mov rcx, fmt            ; First argument: pointer to format string
+        mov rdx, [x]           ; Second argument: integer value to print
+        call printf             ; Call printf
+
+        
+        ; epilogue
+        ; parang return 0;
+        mov rax, 0
+        call    ExitProcess

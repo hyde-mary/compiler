@@ -1,11 +1,4 @@
-int x, y, z;
-
-int hat = 20 + 10;
-
-x = x + 10;
-hat = hat + 1;
-
-z = 10;
+int x, y;
 
 cin>>x;
-cout<<x + 2<<hat;
+cout<<x;
