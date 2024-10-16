@@ -1,1 +1,6 @@
-cout << "hello world"
+int x, y;
+
+x = 3;
+y = 4;
+
+cout<< x + y;

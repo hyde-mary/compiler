@@ -1,14 +1,12 @@
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <variant>
-#include <vector>
 
 #include "lexer/Lexer.hpp"
+#include "parser/Parser.hpp"
 
 std::string printTokenType(
     TokenType type); // helper function to print token type (Debugging purposes)
@@ -17,532 +15,6 @@ void writeAssembly(std::string filename, std::string src);
 std::string changeExtension(const std::string &filename,
                             const std::string &newExtension);
 void assembleCode(std::string &filename, std::string &exename);
-
-/* SYNTAX ANALYZER NAMESPACE */
-namespace parser {
-class Node {
-public:
-  ~Node() = default; /* Destructor which can be overridden by subclasses */
-  virtual void print() const = 0;
-  virtual void toString() const = 0;
-};
-
-class IdentifierNode : public Node {
-public:
-  TOKEN identifier;
-  int line; /* Line number of the identifier */
-  IdentifierNode(TOKEN identifier, int line)
-      : identifier(std::move(identifier)), line(line) {}
-
-  void print() const override {
-    std::cout << "\t - IdentifierNode :: IDENTIFIER - " << identifier.lexeme
-              << std::endl;
-  }
-
-  void toString() const override { std::cout << "IdentifierNode" << std::endl; }
-};
-
-class ConstantNode : public Node {
-  /*
-  A constant node is a node that represents a constant or an Integer Literal.
-  */
-public:
-  TOKEN constant;
-  int line; /* Line number of the constant */
-  ConstantNode(TOKEN constant, int line)
-      : constant(std::move(constant)), line(line) {}
-
-  void print() const override {
-    std::cout << "\t - ConstantNode " << constant.lexeme << std::endl;
-  }
-  void toString() const override { std::cout << "ConstantNode" << std::endl; }
-};
-
-class ExpressionNode : public Node {
-  /*
-      An expression node is a node that represents an expression.
-      In the context of the grammar, this is a binary expression.
-  */
-public:
-  char OP;
-  std::shared_ptr<Node> left;
-  std::shared_ptr<Node> right;
-  int line; /* Line number of the operator */
-
-  ExpressionNode(char OP, std::shared_ptr<Node> left,
-                 std::shared_ptr<Node> right)
-      : OP(OP), left(std::move(left)), right(std::move(right)) {}
-
-  void print() const override {
-    std::cout << "\t - ExpressionNode " << OP << std::endl;
-    std::cout << "\t\t - left: ";
-    left->print();
-    std::cout << "\t\t - right: ";
-    right->print();
-  }
-
-  void toString() const override { std::cout << "ExpressionNode" << std::endl; }
-};
-
-class AssignmentNode : public Node {
-public:
-  std::shared_ptr<IdentifierNode> identifier;
-  std::shared_ptr<Node> assignment;
-
-  // Updated constructor to remove the line parameter
-  AssignmentNode(std::shared_ptr<IdentifierNode> identifier,
-                 std::shared_ptr<Node> assignment)
-      : identifier(std::move(identifier)), assignment(std::move(assignment)) {}
-
-  void print() const override {
-    std::cout << "- AssignmentNode" << " " << identifier->identifier.lexeme
-              << " " << std::endl;
-    assignment->print();
-  }
-  void toString() const override { std::cout << "AssignmentNode" << std::endl; }
-};
-
-class DeclarationNode : public Node {
-public:
-  TokenType type;
-  std::variant<std::vector<std::shared_ptr<IdentifierNode>>,
-               std::shared_ptr<AssignmentNode>>
-      product;
-
-  // Constructor that accepts the type and identifier as parameters
-  DeclarationNode(TokenType type,
-                  std::variant<std::vector<std::shared_ptr<IdentifierNode>>,
-                               std::shared_ptr<AssignmentNode>>
-                      product)
-      : type(type), product(std::move(product)) {}
-
-  void print() const override {
-    std::cout << "DeclarationNode" << std::endl;
-    if (std::holds_alternative<std::shared_ptr<AssignmentNode>>(product)) {
-      auto assignment = std::get<std::shared_ptr<AssignmentNode>>(product);
-      assignment->print();
-    } else {
-      auto identifiers =
-          std::get<std::vector<std::shared_ptr<IdentifierNode>>>(product);
-      for (const auto &identifier : identifiers) {
-        identifier->print();
-      }
-    }
-  }
-
-  void toString() const override {
-    std::cout << "DeclarationNode" << std::endl;
-  }
-};
-
-class SequenceNode : public Node {
-  /* This node represents a sequence of nodes. Can be sequence for assignment
-   * declaration, etc.*/
-public:
-  std::vector<std::shared_ptr<Node>> statements;
-
-  SequenceNode() = default;
-
-  // Add a statement to the sequence
-  void addStatement(std::shared_ptr<Node> statement) {
-    statements.push_back(std::move(statement));
-  }
-
-  void print() const override {
-    std::cout << "SequenceNode" << std::endl;
-    for (const auto &stmt : statements) {
-      stmt->print();
-    }
-  }
-
-  void toString() const override { std::cout << "SequenceNode" << std::endl; }
-};
-
-class StringLiteralNode : public Node {
-public:
-  TOKEN literal;
-  StringLiteralNode(TOKEN literal) : literal(std::move(literal)) {}
-
-  void print() const override {
-    std::cout << "\t - StringLiteralNode " << "'" << literal.lexeme << "'"
-              << std::endl;
-  }
-
-  void toString() const override {
-    std::cout << "StringLiteralNode" << std::endl;
-  }
-};
-
-class CoutNode : public Node {
-public:
-  std::vector<std::shared_ptr<Node>> operands;
-  CoutNode(std::vector<std::shared_ptr<Node>> operands)
-      : operands(std::move(operands)) {}
-
-  void print() const override {
-    std::cout << "CoutNode " << std::endl;
-    for (const auto &operand : operands) {
-      operand->print();
-    }
-  }
-  void toString() const override { std::cout << "CoutNode" << std::endl; }
-};
-
-class CinNode : public Node {
-public:
-  std::vector<std::shared_ptr<Node>> operands;
-  CinNode(std::vector<std::shared_ptr<Node>> operands)
-      : operands(std::move(operands)) {}
-
-  void print() const override {
-    std::cout << "CinNode " << std::endl;
-    for (const auto &operand : operands) {
-      operand->print();
-    }
-  }
-  void toString() const override { std::cout << "CinNode" << std::endl; }
-};
-
-class Parser {
-public:
-  Parser(std::vector<TOKEN> tokens) : TOKENS(std::move(tokens)), NODES{} {}
-
-  std::vector<std::shared_ptr<Node>> parse() {
-    // Parse all the statements from the tokens vector
-    while (peek().has_value()) {
-      if (auto node = parseStatement(); node.has_value()) {
-        NODES.push_back(*node);
-      }
-    }
-    return NODES;
-  }
-
-private:
-  std::vector<TOKEN> TOKENS;
-  std::vector<std::shared_ptr<Node>> NODES;
-
-  int P_COUNTER = 0;
-
-  std::optional<TOKEN> peek() {
-    if (P_COUNTER >= TOKENS.size()) {
-      return std::nullopt;
-    }
-    return TOKENS.at(P_COUNTER);
-  }
-
-  std::optional<TOKEN> consume() {
-    if (P_COUNTER >= TOKENS.size()) {
-      return std::nullopt;
-    }
-    return TOKENS.at(P_COUNTER++);
-  }
-
-  std::shared_ptr<ConstantNode> parseConstant() {
-    auto token = peek().value(); // peak the current token
-    expect(TokenType::CONSTANT,
-           token); // check if the current token is a constant
-    consume();
-    return std::make_shared<ConstantNode>(token, token.line);
-  }
-
-  std::shared_ptr<IdentifierNode> parseIdentifier() {
-    auto token = peek().value();
-    expect(TokenType::IDENTIFIER, token);
-    consume();
-    return std::make_shared<IdentifierNode>(token, token.line);
-  }
-
-  std::shared_ptr<Node> parseConstantOrIdentifier() {
-    if (peek().value().type == TokenType::CONSTANT) {
-      return parseConstant();
-    } else if (peek().value().type == TokenType::IDENTIFIER) {
-      return parseIdentifier();
-    } else {
-      throw std::runtime_error("Invalid token");
-    }
-  }
-
-  std::shared_ptr<Node> parseExpression() {
-    auto left = parseConstantOrIdentifier(); // this will parse a constant and
-                                             // consume the token
-
-    // Check if the current token after consumption is an operator
-    if (peek().value().type == TokenType::ADDITION_OPERATOR) {
-      consume(); // Consume '+'
-      auto right = parseConstantOrIdentifier();
-      return std::make_shared<ExpressionNode>('+', left, right);
-    } else if (peek().value().type == TokenType::SUBTRACTION_OPERATOR) {
-      consume(); // Consume '-'
-      auto right = parseConstantOrIdentifier();
-      return std::make_shared<ExpressionNode>('-', left, right);
-    }
-    // Check if the next token is a delimiter (e.g., ';')
-    // auto token = peek().value();
-    // expect(TokenType::DELIMITER, token);
-
-    return left;
-  }
-
-  std::shared_ptr<AssignmentNode> parseAssignment() {
-    // Parse the identifier
-    // automatically consumes
-    auto identifier =
-        parseIdentifier(); // This should return a shared_ptr<IdentifierNode>
-    // Check if the next token is the assignment operator
-    TOKEN token = peek().value();
-
-    expect(TokenType::ASSIGNMENT_OPERATOR,
-           token); // Throws error if not an assignment operator
-    consume();     // Consume the assignment operator
-
-    // Parse the expression or constant
-    auto expression =
-        parseExpression(); // Ensure this returns the correct variant type
-
-    // Check if the next token is a delimiter (e.g., ';')
-    token = peek().value();
-
-    expect(TokenType::DELIMITER, token); // Throws error if not a delimiter
-    consume();
-
-    // Create and return the AssignmentNode
-    return std::make_shared<AssignmentNode>(identifier, expression);
-  }
-
-  std::shared_ptr<Node> parseDeclaration() {
-    std::vector<std::shared_ptr<IdentifierNode>> identifiers;
-
-    const TokenType declarationType = peek().value().type;
-    consume();
-
-    // Parse identifiers until the next delimiter (e.g., ';')
-    // Possible side effect here is when there is no delimiter
-    // in the source code.
-    while (peek().value().type == TokenType::IDENTIFIER ||
-           peek().value().type == TokenType::PUNCTUATOR) {
-      if (peek().value().type == TokenType::IDENTIFIER) {
-        auto identifier = parseIdentifier(); // simply parse the identifier
-
-        // after consumption of the parseIdentifier, we check if the next token
-        // is an assignment operator
-        if (peek().value().type == TokenType::ASSIGNMENT_OPERATOR) {
-          consume(); // we consume the token
-          // we parse the expression and create an assignment node
-          auto expr = parseExpression();
-          auto assignment = std::make_shared<AssignmentNode>(identifier, expr);
-          auto token = peek().value();
-          expect(TokenType::DELIMITER, token);
-          consume();
-          // We encapsulate the assignment node in a declaration node
-          // and return it
-
-          return std::make_shared<DeclarationNode>(declarationType, assignment);
-        } else {
-          // Otherwise, it's just an identifier in a list of declarations
-          identifiers.push_back(identifier);
-
-          // checks if there is a missing punctuator
-          if (peek().has_value() &&
-              peek().value().type == TokenType::IDENTIFIER) {
-            throw std::runtime_error(
-                "Syntax Error: Missing punctuator between identifiers.");
-          }
-        }
-      } else if (peek().value().type == TokenType::PUNCTUATOR) {
-        consume();
-        continue;
-      } else {
-        throw std::runtime_error(
-            "Syntax Error: Expected delimiter at the end of declaration.");
-      }
-    }
-    auto token = peek().value();
-    expect(TokenType::DELIMITER, token);
-    consume();
-    return std::make_shared<DeclarationNode>(declarationType, identifiers);
-  }
-
-  std::shared_ptr<Node> parseLiteral() {
-    auto token = peek().value();
-    expect(TokenType::LITERAL, token);
-    consume();
-    return std::make_shared<StringLiteralNode>(token);
-  }
-
-  std::shared_ptr<Node> parseCout() {
-
-    std::vector<std::shared_ptr<Node>> outputOperands;
-
-    auto token = peek().value();
-    expect(TokenType::COUT_KEYWORD, token);
-    consume();
-
-    while (peek().value().type == TokenType::IDENTIFIER ||
-           peek().value().type == TokenType::CONSTANT ||
-           peek().value().type == TokenType::LITERAL ||
-           peek().value().type == TokenType::COUT_OPERATOR) {
-
-      if (peek().value().type == TokenType::COUT_OPERATOR) {
-        consume();
-        token = peek().value();
-        if (token.type != TokenType::IDENTIFIER &&
-            token.type != TokenType::CONSTANT &&
-            token.type != TokenType::LITERAL) {
-          throw std::runtime_error("Syntax Error: Expected identifier, "
-                                   "constant, or literal after << operator.");
-        }
-        continue;
-      }
-
-      if (peek().value().type == TokenType::IDENTIFIER ||
-          peek().value().type == TokenType::CONSTANT) {
-        auto expr = parseExpression();
-        outputOperands.push_back(expr);
-      } else if (peek().value().type == TokenType::LITERAL) {
-        auto literal = parseLiteral();
-        outputOperands.push_back(literal);
-      }
-    }
-
-    // expect token at the end
-    token = peek().value();
-    expect(TokenType::DELIMITER, token);
-    consume();
-
-    return std::make_shared<CoutNode>(outputOperands);
-  }
-
-  std::shared_ptr<Node> parseCin() {
-    std::vector<std::shared_ptr<Node>> inputOperands;
-
-    auto token = peek().value();
-    expect(TokenType::CIN_KEYWORD, token);
-    consume();
-
-    while (peek().value().type == TokenType::IDENTIFIER ||
-           peek().value().type == TokenType::CIN_OPERATOR) {
-
-      if (peek().value().type == TokenType::IDENTIFIER) {
-        auto identifier = parseIdentifier();
-        inputOperands.push_back(identifier);
-      } else if (peek().value().type == TokenType::CIN_OPERATOR) {
-        consume();
-        // we always expect an identifier after the CIN operator
-        // if there is no identifier, the expect() will throw an error
-        token = peek().value();
-        expect(TokenType::IDENTIFIER, token);
-        continue;
-      }
-    }
-
-    // expect token at the end
-    token = peek().value();
-    expect(TokenType::DELIMITER, token);
-    consume();
-
-    return std::make_shared<CinNode>(inputOperands);
-  }
-
-  std::optional<std::shared_ptr<Node>> parseStatement() {
-    TOKEN token = peek().value();
-
-    switch (token.type) {
-    case TokenType::IDENTIFIER: {
-      auto assignmentNode = parseAssignment();
-
-      if (assignmentNode) {
-        // Create a new SequenceNode and add the parsed statement
-        auto sequenceNode = std::make_shared<SequenceNode>();
-        sequenceNode->addStatement(assignmentNode);
-        return sequenceNode;
-      } else {
-        throw std::runtime_error("Failed to parse statement at line " +
-                                 std::to_string(token.line));
-      }
-    } break;
-    case TokenType::INT_KEYWORD: {
-
-      auto declarationNode = parseDeclaration();
-
-      if (declarationNode) {
-        // auto sequenceNode = std::make_shared<SequenceNode>();
-        // sequenceNode->addStatement(declarationNode);
-        return declarationNode;
-      } else {
-        throw std::runtime_error("Failed to parse statement at line " +
-                                 std::to_string(token.line));
-      }
-    } break;
-    case TokenType::COUT_KEYWORD: {
-      auto coutNode = parseCout();
-
-      if (coutNode) {
-        // Create a new SequenceNode and add the parsed statement
-        return coutNode;
-      } else {
-        throw std::runtime_error("Failed to parse statement at line " +
-                                 std::to_string(token.line));
-      }
-    }
-
-    case TokenType::CIN_KEYWORD: {
-      auto cinNode = parseCin();
-
-      if (cinNode) {
-        // Create a new SequenceNode and add the parsed statement
-        return cinNode;
-      } else {
-        throw std::runtime_error("Failed to parse statement at line " +
-                                 std::to_string(token.line));
-      }
-    }
-    }
-    return std::nullopt;
-  }
-
-  std::string printTokenType(TokenType type) {
-    switch (type) {
-    case TokenType::IDENTIFIER:
-      return "IDENTIFIER";
-    case TokenType::CONSTANT:
-      return "CONSTANT";
-    case TokenType::CIN_KEYWORD:
-      return "CIN_KEYWORD";
-    case TokenType::COUT_KEYWORD:
-      return "COUT_KEYWORD";
-    case TokenType::PUNCTUATOR:
-      return "PUNCTUATOR";
-    case TokenType::LITERAL:
-      return "LITERAL";
-    case TokenType::ADDITION_OPERATOR:
-      return "ADDITION_OPERATOR";
-    case TokenType::SUBTRACTION_OPERATOR:
-      return "SUBTRACTION_OPERATOR";
-    case TokenType::DELIMITER:
-      return "DELIMITER";
-    case TokenType::ASSIGNMENT_OPERATOR:
-      return "ASSIGNMENT_OPERATOR";
-    case TokenType::CIN_OPERATOR:
-      return "CIN_OPERATOR";
-    case TokenType::COUT_OPERATOR:
-      return "COUT_OPERATOR";
-    case TokenType::UNKNOWN:
-      return "UNKNOWN";
-    }
-    return "UNKNOWN";
-  }
-
-  void expect(TokenType type, TOKEN &token) {
-    // if we reach the end
-    if (token.type != type) {
-      throw std::runtime_error("Expected " + printTokenType(type) +
-                               " but got " + printTokenType(token.type) +
-                               " at line " + std::to_string(token.line));
-    }
-  }
-};
-
-}; // namespace parser
 
 /* SEMANTIC ANALYZER NAMESPACE*/
 namespace semantic {
@@ -590,7 +62,7 @@ private:
 
 class SyntaxAnalyzer {
 public:
-  SyntaxAnalyzer(const std::vector<std::shared_ptr<parser::Node>> &Nodes)
+  SyntaxAnalyzer(const std::vector<std::shared_ptr<node::Node>> &Nodes)
       : Nodes(std::move(Nodes)) {}
 
   void analyzeSemantics() {
@@ -605,24 +77,22 @@ public:
 
 private:
   SymbolTable symbolTable;
-  std::vector<std::shared_ptr<parser::Node>> Nodes;
+  std::vector<std::shared_ptr<node::Node>> Nodes;
 
-  void analyzeDeclaration(std::shared_ptr<parser::DeclarationNode> node) {
+  void analyzeDeclaration(std::shared_ptr<DeclarationNode> node) {
     // we add all declared identifiers in the symbol table
-    if (std::holds_alternative<
-            std::vector<std::shared_ptr<parser::IdentifierNode>>>(
+    if (std::holds_alternative<std::vector<std::shared_ptr<IdentifierNode>>>(
             node->product)) {
       auto identifiers =
-          std::get<std::vector<std::shared_ptr<parser::IdentifierNode>>>(
-              node->product);
+          std::get<std::vector<std::shared_ptr<IdentifierNode>>>(node->product);
       for (auto &id : identifiers) {
         // process identifier
         symbolTable.declareVariable(id->identifier);
       }
-    } else if (std::holds_alternative<std::shared_ptr<parser::AssignmentNode>>(
+    } else if (std::holds_alternative<std::shared_ptr<AssignmentNode>>(
                    node->product)) {
       auto assignment =
-          std::get<std::shared_ptr<parser::AssignmentNode>>(node->product);
+          std::get<std::shared_ptr<AssignmentNode>>(node->product);
       // process assignment
       // LMAO AHSJDAKJDKAJSDLAWKDJLAKWDJLAKWD
       symbolTable.declareVariable(assignment->identifier->identifier);
@@ -630,30 +100,29 @@ private:
     }
   }
 
-  void analyzeExpression(std::shared_ptr<parser::ExpressionNode> node) {
-    std::shared_ptr<parser::Node> left = node->left;
-    std::shared_ptr<parser::Node> right = node->right;
+  void analyzeExpression(std::shared_ptr<ExpressionNode> node) {
+    std::shared_ptr<node::Node> left = node->left;
+    std::shared_ptr<node::Node> right = node->right;
 
     // process left
-    if (auto identifierNode =
-            std::dynamic_pointer_cast<parser::IdentifierNode>(left)) {
+    if (auto identifierNode = std::dynamic_pointer_cast<IdentifierNode>(left)) {
       symbolTable.isInitialized(identifierNode->identifier);
       symbolTable.lookupVariable(identifierNode->identifier);
     }
 
     // process right
     if (auto identifierNode =
-            std::dynamic_pointer_cast<parser::IdentifierNode>(right)) {
+            std::dynamic_pointer_cast<IdentifierNode>(right)) {
       symbolTable.isInitialized(identifierNode->identifier);
       symbolTable.lookupVariable(identifierNode->identifier);
     }
   }
 
-  void analyzeIdentifier(std::shared_ptr<parser::IdentifierNode> node) {
+  void analyzeIdentifier(std::shared_ptr<IdentifierNode> node) {
     symbolTable.lookupVariable(node->identifier);
   }
 
-  void analyzeAssignment(std::shared_ptr<parser::AssignmentNode> node) {
+  void analyzeAssignment(std::shared_ptr<AssignmentNode> node) {
     /*
       An assingment in the Assignment node can be a
       Constant Node, Identifier Node or Expression Node.
@@ -663,7 +132,7 @@ private:
         node->identifier->identifier); // we set the initialized flag as true
 
     if (auto constantNode =
-            std::dynamic_pointer_cast<parser::ConstantNode>(node->assignment)) {
+            std::dynamic_pointer_cast<ConstantNode>(node->assignment)) {
       // maybe a bit redundant lmao
       // since we already know that it's a constant
       // Just incase
@@ -672,18 +141,16 @@ private:
             "Semantic Error: Type mismatch in assignment at line " +
             std::to_string(constantNode->constant.line));
       }
-    } else if (auto identifierNode =
-                   std::dynamic_pointer_cast<parser::IdentifierNode>(
-                       node->assignment)) {
+    } else if (auto identifierNode = std::dynamic_pointer_cast<IdentifierNode>(
+                   node->assignment)) {
       TokenType type = symbolTable.lookupVariable(identifierNode->identifier);
       if (type != node->identifier->identifier.type) {
         throw std::runtime_error(
             "Semantic Error: Type mismatch in assignment at line " +
             std::to_string(identifierNode->identifier.line));
       }
-    } else if (auto expressionNode =
-                   std::dynamic_pointer_cast<parser::ExpressionNode>(
-                       node->assignment)) {
+    } else if (auto expressionNode = std::dynamic_pointer_cast<ExpressionNode>(
+                   node->assignment)) {
       analyzeExpression(expressionNode);
     } else {
       throw std::runtime_error(
@@ -691,10 +158,9 @@ private:
     }
   }
 
-  void analyzeNode(const std::shared_ptr<parser::Node> &node,
+  void analyzeNode(const std::shared_ptr<node::Node> &node,
                    bool isInCin = false) {
-    if (auto identifierNode =
-            std::dynamic_pointer_cast<parser::IdentifierNode>(node)) {
+    if (auto identifierNode = std::dynamic_pointer_cast<IdentifierNode>(node)) {
       analyzeIdentifier(identifierNode);
       // this may be cheating lol
       // basically since we are using cin, we do not need the varibales to be
@@ -706,32 +172,30 @@ private:
       }
       symbolTable.isInitialized(identifierNode->identifier);
     } else if (auto stringLiteralNode =
-                   std::dynamic_pointer_cast<parser::StringLiteralNode>(node)) {
+                   std::dynamic_pointer_cast<StringLiteralNode>(node)) {
       // hatdog
     } else if (auto constantNode =
-                   std::dynamic_pointer_cast<parser::ConstantNode>(node)) {
+                   std::dynamic_pointer_cast<ConstantNode>(node)) {
       // hatdog
     } else if (auto declNode =
-                   std::dynamic_pointer_cast<parser::DeclarationNode>(node)) {
+                   std::dynamic_pointer_cast<DeclarationNode>(node)) {
       analyzeDeclaration(declNode);
     } else if (auto assignNode =
-                   std::dynamic_pointer_cast<parser::AssignmentNode>(node)) {
+                   std::dynamic_pointer_cast<AssignmentNode>(node)) {
       analyzeAssignment(assignNode);
     } else if (auto exprNode =
-                   std::dynamic_pointer_cast<parser::ExpressionNode>(node)) {
+                   std::dynamic_pointer_cast<ExpressionNode>(node)) {
       analyzeExpression(exprNode);
     } else if (auto sequenceNode =
-                   std::dynamic_pointer_cast<parser::SequenceNode>(node)) {
+                   std::dynamic_pointer_cast<SequenceNode>(node)) {
       for (auto statement : sequenceNode->statements) {
         analyzeNode(statement);
       }
-    } else if (auto cinNode =
-                   std::dynamic_pointer_cast<parser::CinNode>(node)) {
+    } else if (auto cinNode = std::dynamic_pointer_cast<CinNode>(node)) {
       for (auto operand : cinNode->operands) {
         analyzeNode(operand, true);
       }
-    } else if (auto coutNode =
-                   std::dynamic_pointer_cast<parser::CoutNode>(node)) {
+    } else if (auto coutNode = std::dynamic_pointer_cast<CoutNode>(node)) {
       for (auto operand : coutNode->operands) {
         analyzeNode(operand);
       }
@@ -745,7 +209,7 @@ private:
 namespace generator {
 class Generator {
 public:
-  Generator(std::vector<std::shared_ptr<parser::Node>> nodes)
+  Generator(std::vector<std::shared_ptr<node::Node>> nodes)
       : NODES(std::move(nodes)) {}
 
   std::string generate() {
@@ -796,8 +260,8 @@ public:
   }
 
 private:
-  std::vector<std::shared_ptr<parser::Node>> NODES;
-  int generator_count = 0; // for incrementing the nodes / parse tree
+  std::vector<std::shared_ptr<node::Node>> NODES;
+  size_t generator_count = 0; // for incrementing the nodes / parse tree
 
   std::unordered_map<std::string, bool> initialized_variables;
   std::unordered_map<std::string, bool> uninitialized_variables;
@@ -806,14 +270,14 @@ private:
   std::ostringstream data_segment;
   std::ostringstream text_segment;
 
-  std::optional<std::shared_ptr<parser::Node>> peek() {
+  std::optional<std::shared_ptr<node::Node>> peek() {
     if (generator_count > NODES.size()) {
       return std::nullopt;
     }
     return NODES.at(generator_count);
   }
 
-  std::optional<std::shared_ptr<parser::Node>> consume() {
+  std::optional<std::shared_ptr<node::Node>> consume() {
     if (generator_count > NODES.size()) {
       return std::nullopt;
     }
@@ -821,26 +285,26 @@ private:
   }
 
   std::ostringstream
-  processExpression(std::shared_ptr<parser::ExpressionNode> expressionNode,
+  processExpression(std::shared_ptr<ExpressionNode> expressionNode,
                     bool isIn = false) {
     // return output;
     std::ostringstream output;
 
-    if (auto leftNode = std::dynamic_pointer_cast<parser::IdentifierNode>(
-            expressionNode->left)) {
+    if (auto leftNode =
+            std::dynamic_pointer_cast<IdentifierNode>(expressionNode->left)) {
       // if (!isInitialized(leftNode->identifier.lexeme)) {
       //   data_segment << "    "  << leftNode->identifier.lexeme << " dq 0" <<
       //   "\n";
       // }
       output << "\t\t" << "mov rax, [" << leftNode->identifier.lexeme << "]"
              << "\n";
-    } else if (auto leftNode = std::dynamic_pointer_cast<parser::ConstantNode>(
+    } else if (auto leftNode = std::dynamic_pointer_cast<ConstantNode>(
                    expressionNode->left)) {
       output << "\t\t" << "mov rax, " << leftNode->constant.lexeme << "\n";
     }
 
     if (expressionNode->OP == '+') {
-      if (auto rightNode = std::dynamic_pointer_cast<parser::IdentifierNode>(
+      if (auto rightNode = std::dynamic_pointer_cast<IdentifierNode>(
               expressionNode->right)) {
         // if (!isInitialized(rightNode->identifier.lexeme)) {
         //   data_segment << "    "  << rightNode->identifier.lexeme << " dq 0"
@@ -848,20 +312,18 @@ private:
         // }
         output << "\t\t" << "add rax, [" << rightNode->identifier.lexeme << "]"
                << "\n";
-      } else if (auto rightNode =
-                     std::dynamic_pointer_cast<parser::ConstantNode>(
-                         expressionNode->right)) {
+      } else if (auto rightNode = std::dynamic_pointer_cast<ConstantNode>(
+                     expressionNode->right)) {
         output << "\t\t" << "add rax, " << rightNode->constant.lexeme << "\n";
       }
     }
 
     if (expressionNode->OP == '-') {
-      if (auto rightNode = std::dynamic_pointer_cast<parser::IdentifierNode>(
+      if (auto rightNode = std::dynamic_pointer_cast<IdentifierNode>(
               expressionNode->right)) {
         output << "\t\t" << "sub rax, " << rightNode->identifier.lexeme << "\n";
-      } else if (auto rightNode =
-                     std::dynamic_pointer_cast<parser::ConstantNode>(
-                         expressionNode->right)) {
+      } else if (auto rightNode = std::dynamic_pointer_cast<ConstantNode>(
+                     expressionNode->right)) {
         output << "\t\t" << "sub rax, " << rightNode->constant.lexeme << "\n";
       }
     }
@@ -870,18 +332,17 @@ private:
   }
 
   std::ostringstream
-  processAssignment(std::shared_ptr<parser::AssignmentNode> assignmentNode) {
+  processAssignment(std::shared_ptr<AssignmentNode> assignmentNode) {
 
     std::ostringstream output;
 
     auto assignment = assignmentNode->assignment;
 
     if (auto constantNode =
-            std::dynamic_pointer_cast<parser::ConstantNode>(assignment)) {
+            std::dynamic_pointer_cast<ConstantNode>(assignment)) {
       output << constantNode->constant.lexeme;
     } else if (auto expressionNode =
-                   std::dynamic_pointer_cast<parser::ExpressionNode>(
-                       assignment)) {
+                   std::dynamic_pointer_cast<ExpressionNode>(assignment)) {
       output << processExpression(expressionNode).str();
     }
 
@@ -902,8 +363,7 @@ private:
     return false;
   }
 
-  void
-  processDeclaration(std::shared_ptr<parser::DeclarationNode> declarationNode) {
+  void processDeclaration(std::shared_ptr<DeclarationNode> declarationNode) {
     /*
       The process declaration function is used to generate code for variable
       declarations. If the product of the declaration node is an assignment
@@ -911,18 +371,18 @@ private:
       the product of the declaration node is an identifier node, it will
       generate code for that identifier. (.bss section)
     */
-    if (std::holds_alternative<std::shared_ptr<parser::AssignmentNode>>(
+    if (std::holds_alternative<std::shared_ptr<AssignmentNode>>(
             declarationNode->product)) {
-      auto assignmentNode = std::get<std::shared_ptr<parser::AssignmentNode>>(
-          declarationNode->product);
-      if (auto constNode = std::dynamic_pointer_cast<parser::ConstantNode>(
+      auto assignmentNode =
+          std::get<std::shared_ptr<AssignmentNode>>(declarationNode->product);
+      if (auto constNode = std::dynamic_pointer_cast<ConstantNode>(
               assignmentNode->assignment)) {
         data_segment << "    " << assignmentNode->identifier->identifier.lexeme
                      << " dd " << constNode->constant.lexeme << "\n";
         initialized_variables[assignmentNode->identifier->identifier.lexeme] =
             true;
       } else if (auto expressionNode =
-                     std::dynamic_pointer_cast<parser::ExpressionNode>(
+                     std::dynamic_pointer_cast<ExpressionNode>(
                          assignmentNode->assignment)) {
         /*
           if the declaration is an expression node, it will generate code for
@@ -939,11 +399,10 @@ private:
       }
 
     } else if (std::holds_alternative<
-                   std::vector<std::shared_ptr<parser::IdentifierNode>>>(
+                   std::vector<std::shared_ptr<IdentifierNode>>>(
                    declarationNode->product)) {
-      auto identNodes =
-          std::get<std::vector<std::shared_ptr<parser::IdentifierNode>>>(
-              declarationNode->product);
+      auto identNodes = std::get<std::vector<std::shared_ptr<IdentifierNode>>>(
+          declarationNode->product);
       for (auto &id : identNodes) {
         // indentifier nodes under declaration node indicates uninitialized
         // variables these variables are declared in the bss segment
@@ -955,26 +414,25 @@ private:
     }
   }
 
-  std::ostringstream processCout(std::shared_ptr<parser::CoutNode> coutNode) {
+  std::ostringstream processCout(std::shared_ptr<CoutNode> coutNode) {
 
     std::ostringstream output;
 
     for (auto &expr : coutNode->operands) {
       if (auto expressionNode =
-              std::dynamic_pointer_cast<parser::ExpressionNode>(expr)) {
+              std::dynamic_pointer_cast<ExpressionNode>(expr)) {
         output << processExpression(expressionNode).str() << "\n";
         output << "\t\t" << "mov rcx, fmt_int" << "\n";
         output << "\t\t" << "mov rdx, rax" << "\n";
         output << "\t\t" << "call printf" << "\n";
       } else if (auto identifierNode =
-                     std::dynamic_pointer_cast<parser::IdentifierNode>(expr)) {
+                     std::dynamic_pointer_cast<IdentifierNode>(expr)) {
         output << "\t\t" << "mov rcx, fmt_int" << "\n";
         output << "\t\t" << "mov rdx, [" << identifierNode->identifier.lexeme
                << "]" << "\n";
         output << "\t\t" << "call printf" << "\n";
       } else if (auto literalNode =
-                     std::dynamic_pointer_cast<parser::StringLiteralNode>(
-                         expr)) {
+                     std::dynamic_pointer_cast<StringLiteralNode>(expr)) {
 
         // we add a string in the datasegment first
         // then we refernce it when invoking lea rdx
@@ -985,7 +443,7 @@ private:
                << "\n";
         output << "\t\t" << "call printf" << "\n";
       } else if (auto constantLiteral =
-                     std::dynamic_pointer_cast<parser::ConstantNode>(expr)) {
+                     std::dynamic_pointer_cast<ConstantNode>(expr)) {
         output << "\t\t" << "mov rcx, fmt_int" << "\n";
         output << "\t\t" << "mov rdx, " << constantLiteral->constant.lexeme
                << "\n";
@@ -996,13 +454,12 @@ private:
     return output;
   }
 
-  std::ostringstream processCin(std::shared_ptr<parser::CinNode> cinNode) {
+  std::ostringstream processCin(std::shared_ptr<CinNode> cinNode) {
 
     std::ostringstream output;
 
     for (auto &expr : cinNode->operands) {
-      auto identifierNode =
-          std::dynamic_pointer_cast<parser::IdentifierNode>(expr);
+      auto identifierNode = std::dynamic_pointer_cast<IdentifierNode>(expr);
       output << "\t\t" << "lea rcx, [input_int]" << "\n";
       output << "\t\t" << "lea rdx, [" << identifierNode->identifier.lexeme
              << "]" << "\n";
@@ -1012,10 +469,9 @@ private:
     return output;
   }
 
-  void nodeGenerator(std::shared_ptr<parser::Node> node) {
+  void nodeGenerator(std::shared_ptr<node::Node> node) {
 
-    if (auto declNode =
-            std::dynamic_pointer_cast<parser::DeclarationNode>(node)) {
+    if (auto declNode = std::dynamic_pointer_cast<DeclarationNode>(node)) {
       // TODO: process declaration
       // this is a void function, as it only assigns/checks for variable
       // declarations the declared variables are added to a map of key value
@@ -1024,23 +480,22 @@ private:
       processDeclaration(declNode);
 
     } else if (auto assignNode =
-                   std::dynamic_pointer_cast<parser::AssignmentNode>(node)) {
+                   std::dynamic_pointer_cast<AssignmentNode>(node)) {
       // TODO: process assignment
-      if (auto constNode = std::dynamic_pointer_cast<parser::ConstantNode>(
-              assignNode->assignment)) {
+      if (auto constNode =
+              std::dynamic_pointer_cast<ConstantNode>(assignNode->assignment)) {
         text_segment << "\t" << "mov dword ["
                      << assignNode->identifier->identifier.lexeme << "], "
                      << constNode->constant.lexeme << "\n";
       } else if (auto expressionNode =
-                     std::dynamic_pointer_cast<parser::ExpressionNode>(
+                     std::dynamic_pointer_cast<ExpressionNode>(
                          assignNode->assignment)) {
         text_segment << processAssignment(assignNode).str() << "\n";
         text_segment << "\t\t" << "mov ["
                      << assignNode->identifier->identifier.lexeme << "], rax\n";
       }
 
-    } else if (auto cinNode =
-                   std::dynamic_pointer_cast<parser::CinNode>(node)) {
+    } else if (auto cinNode = std::dynamic_pointer_cast<CinNode>(node)) {
       // TODO: process cin
       /**
        *
@@ -1050,11 +505,10 @@ private:
        integer call scanf
        */
       text_segment << processCin(cinNode).str() << "\n";
-    } else if (auto coutNode =
-                   std::dynamic_pointer_cast<parser::CoutNode>(node)) {
+    } else if (auto coutNode = std::dynamic_pointer_cast<CoutNode>(node)) {
       text_segment << processCout(coutNode).str() << "\n";
     } else if (auto sequenceNode =
-                   std::dynamic_pointer_cast<parser::SequenceNode>(node)) {
+                   std::dynamic_pointer_cast<SequenceNode>(node)) {
       for (auto statement : sequenceNode->statements) {
         nodeGenerator(statement);
       }
@@ -1082,7 +536,7 @@ int main(int argc, char *argv[]) {
     std::vector<TOKEN> TOKENS = lexer.lex();
 
     parser::Parser parser(TOKENS);
-    std::vector<std::shared_ptr<parser::Node>> NODES = parser.parse();
+    std::vector<std::shared_ptr<node::Node>> NODES = parser.parse();
     semantic::SyntaxAnalyzer analyzer(NODES);
     generator::Generator generator(NODES);
 

@@ -15,7 +15,7 @@ public:
 
 private:
   // class variables
-  int LEX_COUNTER = 0;
+  size_t LEX_COUNTER = 0;
   int PROGRAM_LINE = 1;
   std::string SRC_CODE;
 
