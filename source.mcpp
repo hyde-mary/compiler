@@ -1,6 +1,0 @@
-int x, y;
-
-int z = 20 + 20;
-
-cin>>x>>y;
-cout<<x + y;
