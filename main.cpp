@@ -38,6 +38,7 @@ std::string printTokenType(TokenType type); // helper function to print token ty
 std::string fetchSourceCode(std::string filename);
 void writeAssembly(std::string filename, std::string src);
 std::string changeExtension(const std::string& filename, const std::string& newExtension);
+void assembleCode(std::string& filename, std::string& exename);
 
 
 class Lexer
@@ -1361,6 +1362,7 @@ int main(int argc, char *argv[])
 
   std::string CODE;
   std::string filename = argv[1];
+  std::string exename = argv[2];
 
   CODE = fetchSourceCode(filename);
 
@@ -1405,7 +1407,10 @@ int main(int argc, char *argv[])
     std::cout << "Code Generator Results: " << std::endl;
     std::string asm_generated= generator.generate();
 
-    writeAssembly(changeExtension(filename, ".asm"), asm_generated);
+    std::string newFile = changeExtension(filename, ".asm");
+    writeAssembly(newFile, asm_generated);
+
+    assembleCode(filename, exename); // assemble the ASM file
 
   }
   catch (std::exception &e)
@@ -1488,4 +1493,17 @@ std::string changeExtension(const std::string& filename, const std::string& newE
     
     // Return the filename up to the dot, then add the new extension
     return filename.substr(0, dotPos) + newExtension;
+}
+
+void assembleCode(std::string& filename, std::string& exename) {
+  std::string file_asm = changeExtension(filename, ".asm");
+  std::string file_o = changeExtension(filename, ".o");
+  std::string file_exe = changeExtension(exename, ".exe");
+
+  std::string nasm = "nasm -f win64 -o " + file_o + " " + file_asm;
+  std::cout << nasm << std::endl;
+  std::system(nasm.c_str());
+  std::string gcc = "gcc -o " + file_exe + " " + file_o;
+  std::cout << gcc << std::endl;
+  std::system(gcc.c_str());
 }
