@@ -1,4 +1,4 @@
 int x, y;
 
-cin>>x;
-cout<<x;
+cin>>x>>y;
+cout<<x + y;

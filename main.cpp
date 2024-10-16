@@ -883,24 +883,43 @@ namespace semantic
   public:
     void declareVariable(TOKEN &token)
     {
-      if (variables.find(token.lexeme) != variables.end())
+      if (declared_variables.find(token.lexeme) != declared_variables.end())
       {
         throw std::runtime_error("Semantic Error: Variable '" + token.lexeme + "' is already declared.");
       }
-      variables[token.lexeme] = token.type;
+      declared_variables[token.lexeme] = token.type;
+      initialized_variables[token.lexeme] = false;
     }
 
     TokenType lookupVariable(TOKEN &token)
     {
-      if (variables.find(token.lexeme) == variables.end())
+      if (declared_variables.find(token.lexeme) == declared_variables.end())
       {
         throw std::runtime_error("Semantic Error: Variable '" + token.lexeme + "' is not declared.");
       }
       return token.type;
     }
 
+    void setInitialized (TOKEN &token) {
+      initialized_variables[token.lexeme] = true;
+    }
+
+    void isInitialized(TOKEN &token) {
+      auto it = initialized_variables.find(token.lexeme);
+      if (it == initialized_variables.end() || it->second != true) {
+          throw std::runtime_error("Semantic Error: Variable '" + token.lexeme + "' is not initialized.");
+      }
+}
+    // for debugging
+    void printInitialized() { 
+      for (auto var: initialized_variables) {
+        std::cout << var.first << " :: " << var.second << std::endl;
+      }
+    }
+
   private:
-    std::unordered_map<std::string, TokenType> variables;
+    std::unordered_map<std::string, TokenType> declared_variables;
+    std::unordered_map<std::string, bool> initialized_variables;
   };
 
   class SyntaxAnalyzer
@@ -915,6 +934,7 @@ namespace semantic
         std::cout << "Analyzing: ";
         node->toString();
         analyzeNode(node);
+        // symbolTable.printInitialized();
       }
       std::cout << "Semantics Analyzed: No errors." << std::endl;
     }
@@ -953,12 +973,14 @@ namespace semantic
       // process left
       if (auto identifierNode = std::dynamic_pointer_cast<parser::IdentifierNode>(left))
       {
+        symbolTable.isInitialized(identifierNode->identifier);
         symbolTable.lookupVariable(identifierNode->identifier);
       }
 
       // process right
       if (auto identifierNode = std::dynamic_pointer_cast<parser::IdentifierNode>(right))
       {
+        symbolTable.isInitialized(identifierNode->identifier);
         symbolTable.lookupVariable(identifierNode->identifier);
       }
     }
@@ -975,6 +997,8 @@ namespace semantic
         Constant Node, Identifier Node or Expression Node.
         We nee to analyze each of these nodes individually.
       */
+      symbolTable.setInitialized(node->identifier->identifier); // we set the initialized flag as true
+
       if (auto constantNode = std::dynamic_pointer_cast<parser::ConstantNode>(node->assignment))
       {
         // maybe a bit redundant lmao
@@ -1003,11 +1027,17 @@ namespace semantic
       }
     }
 
-    void analyzeNode(const std::shared_ptr<parser::Node> &node)
+    void analyzeNode(const std::shared_ptr<parser::Node> &node, bool isInCin = false)
     {
       if (auto identifierNode = std::dynamic_pointer_cast<parser::IdentifierNode>(node))
       {
         analyzeIdentifier(identifierNode);
+        // this may be cheating lol
+        // basically since we are using cin, we do not need the varibales to be initialized
+        if (isInCin) {
+          symbolTable.setInitialized(identifierNode->identifier); // we cheat by making it seem that the variable is initialized already
+        }
+        symbolTable.isInitialized(identifierNode->identifier);
       }
       else if (auto stringLiteralNode = std::dynamic_pointer_cast<parser::StringLiteralNode>(node)) {
         // hatdog
@@ -1037,7 +1067,7 @@ namespace semantic
       {
         for (auto operand : cinNode->operands)
         {
-          analyzeNode(operand);
+          analyzeNode(operand, true);
         }
       }
       else if (auto coutNode = std::dynamic_pointer_cast<parser::CoutNode>(node))
@@ -1077,6 +1107,7 @@ namespace generator
 
         // declared variables initialized
         data_segment << "section .data \n";
+        data_segment << "    input_int db \"%d\", 0\n";
         data_segment << "    fmt_int db \"%d\", 10, 0\n"; 
         data_segment << "    fmt_literal db \"%s\", 10, 0\n";  
         data_segment << "    fmt_char db \"%c\", 10, 0\n";
@@ -1094,6 +1125,7 @@ namespace generator
 
         // end of text segment
         text_segment << std::endl;
+        text_segment << "\t\t" << "mov rcx, 1 \n";
         text_segment << "\t\t" << "xor rcx, rcx\n";
         text_segment << "\t\t" << "call ExitProcess";
 
@@ -1134,15 +1166,14 @@ namespace generator
       }
 
 
-      std::ostringstream processExpression (std::shared_ptr<parser::ExpressionNode> expressionNode) {
+      std::ostringstream processExpression (std::shared_ptr<parser::ExpressionNode> expressionNode, bool isIn = false) {
         // return output;
         std::ostringstream output;
 
         if (auto leftNode = std::dynamic_pointer_cast<parser::IdentifierNode>(expressionNode->left)) {
-          if (!isInitialized(leftNode->identifier.lexeme)) {
-            std::cout << "Hello" <<std::endl;
-            data_segment << "    "  << leftNode->identifier.lexeme << " dq 0" << "\n";
-          }
+          // if (!isInitialized(leftNode->identifier.lexeme)) {
+          //   data_segment << "    "  << leftNode->identifier.lexeme << " dq 0" << "\n";
+          // }
           output << "\t\t" << "mov rax, [" << leftNode->identifier.lexeme << "]" << "\n";
         } else if (auto leftNode = std::dynamic_pointer_cast<parser::ConstantNode>(expressionNode->left)) {
           output << "\t\t"  << "mov rax, " << leftNode->constant.lexeme << "\n";
@@ -1150,9 +1181,9 @@ namespace generator
 
         if (expressionNode->OP == '+') {
           if (auto rightNode = std::dynamic_pointer_cast<parser::IdentifierNode>(expressionNode->right)) {
-            if (!isInitialized(rightNode->identifier.lexeme)) {
-              data_segment << "    "  << rightNode->identifier.lexeme << " dq 0" << "\n";
-            }
+            // if (!isInitialized(rightNode->identifier.lexeme)) {
+            //   data_segment << "    "  << rightNode->identifier.lexeme << " dq 0" << "\n";
+            // }
             output << "\t\t"  << "add rax, [" << rightNode->identifier.lexeme << "]" << "\n";
           } else if (auto rightNode = std::dynamic_pointer_cast<parser::ConstantNode>(expressionNode->right)) {
             output << "\t\t"  << "add rax, " << rightNode->constant.lexeme << "\n";
@@ -1272,7 +1303,7 @@ namespace generator
 
         for (auto &expr : cinNode->operands) {
           auto identifierNode = std::dynamic_pointer_cast<parser::IdentifierNode>(expr);
-          output << "\t\t" << "lea rcx, [fmt_int]" << "\n";
+          output << "\t\t" << "lea rcx, [input_int]" << "\n";
           output << "\t\t" << "lea rdx, [" << identifierNode->identifier.lexeme << "]" << "\n";
           output << "\t\t" << "call scanf" << "\n";
         }
@@ -1309,7 +1340,6 @@ namespace generator
            */
           text_segment << processCin(cinNode).str() << "\n";
         } else if (auto coutNode = std::dynamic_pointer_cast<parser::CoutNode>(node)) {
-          // TODO: process cout
           text_segment << processCout(coutNode).str() << "\n";
         } else if (auto sequenceNode = std::dynamic_pointer_cast<parser::SequenceNode>(node)) {
           for (auto statement : sequenceNode->statements) {
