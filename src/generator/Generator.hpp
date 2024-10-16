@@ -8,7 +8,6 @@
 #include <sstream>
 #include <unordered_map>
 
-namespace generator {
 class Generator {
 public:
   Generator(std::vector<std::shared_ptr<node::Node>> nodes);
@@ -49,6 +48,5 @@ private:
 
   void nodeGenerator(std::shared_ptr<node::Node> node);
 };
-} // namespace generator
 
 #endif // !GENERATOR_HPP
