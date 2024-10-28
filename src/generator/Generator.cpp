@@ -195,6 +195,22 @@ void Generator::processDeclaration(
   }
 }
 
+std::string remove_literal_whitespace(std::string str) {
+  std::string result;
+  std::string::iterator it = str.begin();
+  while (it != str.end()) {
+    if (*it == ' ') {
+      result += '_';
+      ++it;
+      continue;
+    }
+    result += *it;
+    ++it;
+  }
+  std::cout<<result<<std::endl;
+  return result;
+}
+
 std::ostringstream Generator::processCout(std::shared_ptr<CoutNode> coutNode) {
 
   std::ostringstream output;
@@ -216,10 +232,10 @@ std::ostringstream Generator::processCout(std::shared_ptr<CoutNode> coutNode) {
 
       // we add a string in the datasegment first
       // then we refernce it when invoking lea rdx
-      data_segment << "    " << literalNode->literal.lexeme << " db \""
+      data_segment << "    " << remove_literal_whitespace(literalNode->literal.lexeme) << " db \""
                    << literalNode->literal.lexeme << "\", 0" << "\n";
       output << "\t\t" << "mov rcx, fmt_literal" << "\n";
-      output << "\t\t" << "lea rdx, [" << literalNode->literal.lexeme << "]"
+      output << "\t\t" << "lea rdx, [" << remove_literal_whitespace(literalNode->literal.lexeme) << "]"
              << "\n";
       output << "\t\t" << "call printf" << "\n";
     } else if (auto constantLiteral =
