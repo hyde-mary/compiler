@@ -2,27 +2,10 @@
 #define SYNTAX_ANALYZER_HPP
 
 #include "../parser/Parser.hpp"
+#include "SymbolTable.hpp"
 #include <memory>
 #include <unordered_map>
 #include <vector>
-
-namespace semantic {
-class SymbolTable {
-public:
-  void declareVariable(TOKEN &token);
-
-  TokenType lookupVariable(TOKEN &token);
-
-  void setInitialized(TOKEN &token);
-
-  void isInitialized(TOKEN &token);
-  // for debugging
-  void printInitialized();
-
-private:
-  std::unordered_map<std::string, TokenType> declared_variables;
-  std::unordered_map<std::string, bool> initialized_variables;
-};
 
 class SyntaxAnalyzer {
 public:
@@ -45,7 +28,5 @@ private:
   void analyzeNode(const std::shared_ptr<node::Node> &node,
                    bool isInCin = false);
 };
-
-} // namespace semantic
 
 #endif // !SYNTAX_ANALYZER_HPP

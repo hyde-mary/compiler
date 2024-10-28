@@ -1,7 +1,6 @@
 #include "Generator.hpp"
 #include "../parser/Node.hpp"
 
-namespace generator {
 Generator::Generator(std::vector<std::shared_ptr<node::Node>> nodes)
     : NODES(std::move(nodes)) {}
 
@@ -309,4 +308,3 @@ void Generator::nodeGenerator(std::shared_ptr<node::Node> node) {
     }
   }
 }
-}; // namespace generator

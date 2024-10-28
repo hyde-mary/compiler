@@ -1,45 +1,10 @@
 #include "SyntaxAnalyzer.hpp"
 
-void semantic::SymbolTable::declareVariable(TOKEN &token) {
-  if (declared_variables.find(token.lexeme) != declared_variables.end()) {
-    throw std::runtime_error("Semantic Error: Variable '" + token.lexeme +
-                             "' is already declared.");
-  }
-  declared_variables[token.lexeme] = token.type;
-  initialized_variables[token.lexeme] = false;
-}
-
-TokenType semantic::SymbolTable::lookupVariable(TOKEN &token) {
-  if (declared_variables.find(token.lexeme) == declared_variables.end()) {
-    throw std::runtime_error("Semantic Error: Variable '" + token.lexeme +
-                             "' is not declared.");
-  }
-  return token.type;
-}
-
-void semantic::SymbolTable::setInitialized(TOKEN &token) {
-  initialized_variables[token.lexeme] = true;
-}
-
-void semantic::SymbolTable::isInitialized(TOKEN &token) {
-  auto it = initialized_variables.find(token.lexeme);
-  if (it == initialized_variables.end() || it->second != true) {
-    throw std::runtime_error("Semantic Error: Variable '" + token.lexeme +
-                             "' is not initialized.");
-  }
-}
-// for debugging
-void semantic::SymbolTable::printInitialized() {
-  for (auto var : initialized_variables) {
-    std::cout << var.first << " :: " << var.second << std::endl;
-  }
-}
-
-semantic::SyntaxAnalyzer::SyntaxAnalyzer(
+SyntaxAnalyzer::SyntaxAnalyzer(
     const std::vector<std::shared_ptr<node::Node>> &Nodes)
     : Nodes(std::move(Nodes)) {}
 
-void semantic::SyntaxAnalyzer::analyzeSemantics() {
+void SyntaxAnalyzer::analyzeSemantics() {
   for (auto &node : Nodes) {
     std::cout << "Analyzing: ";
     node->toString();
@@ -49,8 +14,7 @@ void semantic::SyntaxAnalyzer::analyzeSemantics() {
   std::cout << "Semantics Analyzed: No errors." << std::endl;
 }
 
-void semantic::SyntaxAnalyzer::analyzeDeclaration(
-    std::shared_ptr<DeclarationNode> node) {
+void SyntaxAnalyzer::analyzeDeclaration(std::shared_ptr<DeclarationNode> node) {
   // we add all declared identifiers in the symbol table
   if (std::holds_alternative<std::vector<std::shared_ptr<IdentifierNode>>>(
           node->product)) {
@@ -70,8 +34,7 @@ void semantic::SyntaxAnalyzer::analyzeDeclaration(
   }
 }
 
-void semantic::SyntaxAnalyzer::analyzeExpression(
-    std::shared_ptr<ExpressionNode> node) {
+void SyntaxAnalyzer::analyzeExpression(std::shared_ptr<ExpressionNode> node) {
   std::shared_ptr<node::Node> left = node->left;
   std::shared_ptr<node::Node> right = node->right;
 
@@ -88,13 +51,11 @@ void semantic::SyntaxAnalyzer::analyzeExpression(
   }
 }
 
-void semantic::SyntaxAnalyzer::analyzeIdentifier(
-    std::shared_ptr<IdentifierNode> node) {
+void SyntaxAnalyzer::analyzeIdentifier(std::shared_ptr<IdentifierNode> node) {
   symbolTable.lookupVariable(node->identifier);
 }
 
-void semantic::SyntaxAnalyzer::analyzeAssignment(
-    std::shared_ptr<AssignmentNode> node) {
+void SyntaxAnalyzer::analyzeAssignment(std::shared_ptr<AssignmentNode> node) {
   /*
     An assingment in the Assignment node can be a
     Constant Node, Identifier Node or Expression Node.
@@ -130,8 +91,8 @@ void semantic::SyntaxAnalyzer::analyzeAssignment(
   }
 }
 
-void semantic::SyntaxAnalyzer::analyzeNode(
-    const std::shared_ptr<node::Node> &node, bool isInCin) {
+void SyntaxAnalyzer::analyzeNode(const std::shared_ptr<node::Node> &node,
+                                 bool isInCin) {
   if (auto identifierNode = std::dynamic_pointer_cast<IdentifierNode>(node)) {
     analyzeIdentifier(identifierNode);
     // this may be cheating lol

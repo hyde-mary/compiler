@@ -7,6 +7,7 @@
 #include "generator/Generator.hpp"
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
+#include "semantic/SymbolTable.hpp"
 #include "semantic/SyntaxAnalyzer.hpp"
 
 std::string printTokenType(
@@ -37,8 +38,8 @@ int main(int argc, char *argv[]) {
 
     parser::Parser parser(TOKENS);
     std::vector<std::shared_ptr<node::Node>> NODES = parser.parse();
-    semantic::SyntaxAnalyzer analyzer(NODES);
-    generator::Generator generator(NODES);
+    SyntaxAnalyzer analyzer(NODES);
+    Generator generator(NODES);
 
     // Print tokens for debugging
     // Representation
