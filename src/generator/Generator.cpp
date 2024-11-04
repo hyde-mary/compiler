@@ -198,7 +198,8 @@ std::string remove_literal_whitespace(std::string str) {
   std::string result;
   std::string::iterator it = str.begin();
   while (it != str.end()) {
-    if (*it == ' ') {
+    /* Checks if the current character is a letter */
+    if (!std::isalpha(*it)) {
       result += '_';
       ++it;
       continue;
